@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Health First - Healthcare Appointment Booking System
 
 A comprehensive, responsive frontend application for healthcare appointment management, enabling providers to manage their availability and patients to search and book appointments.
@@ -278,3 +279,6 @@ For support and questions, please contact:
 ---
 
 **Note**: This is a frontend demonstration. In a production environment, this would be integrated with a backend API, database, and proper security measures.
+=======
+# Demo_Session_Portal
+>>>>>>> 02eff61ec58b66a92c99d004b76829e37bb811fc
