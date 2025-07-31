@@ -18,36 +18,43 @@ import {
   EyeOff,
   X
 } from 'lucide-react';
+import { registerProvider } from '../services/api';
 import './ProviderRegistration.css';
 
 const schema = yup.object({
-  firstName: yup.string().required('First name is required'),
-  lastName: yup.string().required('Last name is required'),
+  first_name: yup.string().required('First name is required'),
+  last_name: yup.string().required('Last name is required'),
   email: yup.string().email('Invalid email format').required('Email is required'),
-  phone: yup.string()
-    .matches(/^[+]?[1-9][\d]{0,15}$/, 'Invalid phone number')
+  phone_number: yup.string()
+    .matches(/^\+?1?\d{10,15}$/, 'Phone number must be 10-15 digits with optional +1 prefix')
     .required('Phone number is required'),
-  medicalLicense: yup.string().required('Medical license number is required'),
+  license_number: yup.string().required('Medical license number is required'),
   specialization: yup.string().required('Specialization is required'),
-  yearsExperience: yup.number()
+  years_of_experience: yup.number()
     .min(0, 'Years of experience must be 0 or greater')
     .max(50, 'Years of experience cannot exceed 50')
     .required('Years of experience is required'),
   qualifications: yup.string().required('Medical qualifications are required'),
-  clinicName: yup.string().required('Clinic/Hospital name is required'),
-  street: yup.string().required('Street address is required'),
-  city: yup.string().required('City is required'),
-  state: yup.string().required('State is required'),
-  zipCode: yup.string()
+  clinic_name: yup.string().required('Clinic/Hospital name is required'),
+  street: yup.string()
+    .min(5, 'Street address must be at least 5 characters')
+    .required('Street address is required'),
+  city: yup.string()
+    .min(2, 'City must be at least 2 characters')
+    .required('City is required'),
+  state: yup.string()
+    .min(2, 'State must be at least 2 characters')
+    .required('State is required'),
+  zip: yup.string()
     .matches(/^\d{5}(-\d{4})?$/, 'Invalid ZIP code format')
     .required('ZIP code is required'),
-  practiceType: yup.string().required('Practice type is required'),
+  practice_type: yup.string().required('Practice type is required'),
   password: yup.string()
     .min(8, 'Password must be at least 8 characters')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
       'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character')
     .required('Password is required'),
-  confirmPassword: yup.string()
+  confirm_password: yup.string()
     .oneOf([yup.ref('password'), null], 'Passwords must match')
     .required('Please confirm your password'),
   termsAccepted: yup.boolean()
@@ -94,6 +101,7 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const fileInputRef = useRef(null);
 
   const {
@@ -104,7 +112,26 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
     trigger
   } = useForm({
     resolver: yupResolver(schema),
-    mode: 'onChange'
+    mode: 'onChange',
+    defaultValues: {
+      first_name: '',
+      last_name: '',
+      email: '',
+      phone_number: '+1',
+      license_number: '',
+      specialization: '',
+      years_of_experience: 0,
+      qualifications: '',
+      clinic_name: '',
+      street: '',
+      city: '',
+      state: '',
+      zip: '',
+      practice_type: '',
+      password: '',
+      confirm_password: '',
+      termsAccepted: false
+    }
   });
 
   const watchedPassword = watch('password', '');
@@ -164,13 +191,13 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
   const getFieldsForStep = (step) => {
     switch (step) {
       case 1:
-        return ['firstName', 'lastName', 'email', 'phone'];
+        return ['first_name', 'last_name', 'email', 'phone_number'];
       case 2:
-        return ['medicalLicense', 'specialization', 'yearsExperience', 'qualifications'];
+        return ['license_number', 'specialization', 'years_of_experience', 'qualifications'];
       case 3:
-        return ['clinicName', 'street', 'city', 'state', 'zipCode', 'practiceType'];
+        return ['clinic_name', 'street', 'city', 'state', 'zip', 'practice_type'];
       case 4:
-        return ['password', 'confirmPassword', 'termsAccepted'];
+        return ['password', 'confirm_password', 'termsAccepted'];
       default:
         return [];
     }
@@ -178,17 +205,44 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
+    setErrorMessage(''); // Clear any previous errors
+    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('Form data:', data); // Debug log
+      
+      // Prepare data for API
+      const apiData = {
+        ...data,
+        clinic_address: {
+          street: data.street,
+          city: data.city,
+          state: data.state,
+          zip: data.zip
+        },
+        profilePhoto: profilePhoto // Include profile photo if uploaded
+      };
+
+      // Remove individual address fields as they're now in clinic_address
+      delete apiData.street;
+      delete apiData.city;
+      delete apiData.state;
+      delete apiData.zip;
+
+      console.log('API data being sent:', apiData); // Debug log
+
+      // Call the actual API
+      const response = await registerProvider(apiData);
+      
+      console.log('API response:', response); // Debug log
+      
       setSubmitSuccess(true);
       
       // Call the registration success callback with user data
       if (onRegistrationSuccess) {
         setTimeout(() => {
           onRegistrationSuccess({
-            id: 'provider-new',
-            name: `${data.firstName} ${data.lastName}`,
+            id: response.id || 'provider-new',
+            name: `${data.first_name} ${data.last_name}`,
             email: data.email,
             type: 'provider',
             specialization: data.specialization
@@ -197,6 +251,7 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
       }
     } catch (error) {
       console.error('Registration failed:', error);
+      setErrorMessage(error.message || 'Registration failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -278,6 +333,20 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
           ))}
         </div>
 
+        {errorMessage && (
+          <div className="error-banner">
+            <AlertCircle size={20} />
+            <span>{errorMessage}</span>
+            <button 
+              type="button" 
+              className="error-close"
+              onClick={() => setErrorMessage('')}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit(onSubmit)} className="registration-form">
           {currentStep === 1 && (
             <div className="form-step">
@@ -322,39 +391,39 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="firstName">First Name *</label>
+                  <label htmlFor="first_name">First Name *</label>
                   <div className="input-wrapper">
                     <User size={20} className="input-icon" />
                     <input
-                      id="firstName"
+                      id="first_name"
                       type="text"
-                      {...register('firstName')}
+                      {...register('first_name')}
                       placeholder="Enter your first name"
                     />
                   </div>
-                  {errors.firstName && (
+                  {errors.first_name && (
                     <span className="error-message">
                       <AlertCircle size={16} />
-                      {errors.firstName.message}
+                      {errors.first_name.message}
                     </span>
                   )}
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="lastName">Last Name *</label>
+                  <label htmlFor="last_name">Last Name *</label>
                   <div className="input-wrapper">
                     <User size={20} className="input-icon" />
                     <input
-                      id="lastName"
+                      id="last_name"
                       type="text"
-                      {...register('lastName')}
+                      {...register('last_name')}
                       placeholder="Enter your last name"
                     />
                   </div>
-                  {errors.lastName && (
+                  {errors.last_name && (
                     <span className="error-message">
                       <AlertCircle size={16} />
-                      {errors.lastName.message}
+                      {errors.last_name.message}
                     </span>
                   )}
                 </div>
@@ -380,20 +449,21 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
               </div>
 
               <div className="form-group">
-                <label htmlFor="phone">Phone Number *</label>
+                <label htmlFor="phone_number">Phone Number *</label>
                 <div className="input-wrapper">
                   <Phone size={20} className="input-icon" />
                   <input
-                    id="phone"
+                    id="phone_number"
                     type="tel"
-                    {...register('phone')}
-                    placeholder="Enter your phone number"
+                    {...register('phone_number')}
+                    placeholder="+1234567890 (10-15 digits)"
                   />
                 </div>
-                {errors.phone && (
+                <small className="field-hint">Format: +1 followed by 10 digits (e.g., +1234567890)</small>
+                {errors.phone_number && (
                   <span className="error-message">
                     <AlertCircle size={16} />
-                    {errors.phone.message}
+                    {errors.phone_number.message}
                   </span>
                 )}
               </div>
@@ -408,20 +478,20 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
               </div>
 
               <div className="form-group">
-                <label htmlFor="medicalLicense">Medical License Number *</label>
+                <label htmlFor="license_number">Medical License Number *</label>
                 <div className="input-wrapper">
                   <Shield size={20} className="input-icon" />
                   <input
-                    id="medicalLicense"
+                    id="license_number"
                     type="text"
-                    {...register('medicalLicense')}
+                    {...register('license_number')}
                     placeholder="Enter your medical license number"
                   />
                 </div>
-                {errors.medicalLicense && (
+                {errors.license_number && (
                   <span className="error-message">
                     <AlertCircle size={16} />
-                    {errors.medicalLicense.message}
+                    {errors.license_number.message}
                   </span>
                 )}
               </div>
@@ -446,22 +516,22 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
               </div>
 
               <div className="form-group">
-                <label htmlFor="yearsExperience">Years of Experience *</label>
+                <label htmlFor="years_of_experience">Years of Experience *</label>
                 <div className="input-wrapper">
                   <GraduationCap size={20} className="input-icon" />
                   <input
-                    id="yearsExperience"
+                    id="years_of_experience"
                     type="number"
                     min="0"
                     max="50"
-                    {...register('yearsExperience')}
+                    {...register('years_of_experience')}
                     placeholder="Enter years of experience"
                   />
                 </div>
-                {errors.yearsExperience && (
+                {errors.years_of_experience && (
                   <span className="error-message">
                     <AlertCircle size={16} />
-                    {errors.yearsExperience.message}
+                    {errors.years_of_experience.message}
                   </span>
                 )}
               </div>
@@ -495,20 +565,20 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
               </div>
 
               <div className="form-group">
-                <label htmlFor="clinicName">Clinic/Hospital Name *</label>
+                <label htmlFor="clinic_name">Clinic/Hospital Name *</label>
                 <div className="input-wrapper">
                   <Building size={20} className="input-icon" />
                   <input
-                    id="clinicName"
+                    id="clinic_name"
                     type="text"
-                    {...register('clinicName')}
+                    {...register('clinic_name')}
                     placeholder="Enter clinic or hospital name"
                   />
                 </div>
-                {errors.clinicName && (
+                {errors.clinic_name && (
                   <span className="error-message">
                     <AlertCircle size={16} />
-                    {errors.clinicName.message}
+                    {errors.clinic_name.message}
                   </span>
                 )}
               </div>
@@ -521,9 +591,10 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
                     id="street"
                     type="text"
                     {...register('street')}
-                    placeholder="Enter street address"
+                    placeholder="Enter full street address (minimum 5 characters)"
                   />
                 </div>
+                <small className="field-hint">Must be at least 5 characters long</small>
                 {errors.street && (
                   <span className="error-message">
                     <AlertCircle size={16} />
@@ -541,9 +612,10 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
                       id="city"
                       type="text"
                       {...register('city')}
-                      placeholder="Enter city"
+                      placeholder="Enter city name (minimum 2 characters)"
                     />
                   </div>
+                  <small className="field-hint">Must be at least 2 characters long</small>
                   {errors.city && (
                     <span className="error-message">
                       <AlertCircle size={16} />
@@ -560,9 +632,10 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
                       id="state"
                       type="text"
                       {...register('state')}
-                      placeholder="Enter state"
+                      placeholder="Enter state name (minimum 2 characters)"
                     />
                   </div>
+                  <small className="field-hint">Must be at least 2 characters long</small>
                   {errors.state && (
                     <span className="error-message">
                       <AlertCircle size={16} />
@@ -574,39 +647,39 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="zipCode">ZIP Code *</label>
+                  <label htmlFor="zip">ZIP Code *</label>
                   <div className="input-wrapper">
                     <MapPin size={20} className="input-icon" />
                     <input
-                      id="zipCode"
+                      id="zip"
                       type="text"
-                      {...register('zipCode')}
+                      {...register('zip')}
                       placeholder="Enter ZIP code"
                     />
                   </div>
-                  {errors.zipCode && (
+                  {errors.zip && (
                     <span className="error-message">
                       <AlertCircle size={16} />
-                      {errors.zipCode.message}
+                      {errors.zip.message}
                     </span>
                   )}
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="practiceType">Practice Type *</label>
+                  <label htmlFor="practice_type">Practice Type *</label>
                   <div className="input-wrapper">
                     <Building size={20} className="input-icon" />
-                    <select id="practiceType" {...register('practiceType')}>
+                    <select id="practice_type" {...register('practice_type')}>
                       <option value="">Select practice type</option>
                       {practiceTypes.map((type) => (
                         <option key={type} value={type}>{type}</option>
                       ))}
                     </select>
                   </div>
-                  {errors.practiceType && (
+                  {errors.practice_type && (
                     <span className="error-message">
                       <AlertCircle size={16} />
-                      {errors.practiceType.message}
+                      {errors.practice_type.message}
                     </span>
                   )}
                 </div>
@@ -663,13 +736,13 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
               </div>
 
               <div className="form-group">
-                <label htmlFor="confirmPassword">Confirm Password *</label>
+                <label htmlFor="confirm_password">Confirm Password *</label>
                 <div className="input-wrapper">
                   <Shield size={20} className="input-icon" />
                   <input
-                    id="confirmPassword"
+                    id="confirm_password"
                     type={showConfirmPassword ? 'text' : 'password'}
-                    {...register('confirmPassword')}
+                    {...register('confirm_password')}
                     placeholder="Confirm your password"
                   />
                   <button
@@ -680,10 +753,10 @@ const ProviderRegistration = ({ onSwitchToLogin, onBackToSelector, onRegistratio
                     {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
-                {errors.confirmPassword && (
+                {errors.confirm_password && (
                   <span className="error-message">
                     <AlertCircle size={16} />
-                    {errors.confirmPassword.message}
+                    {errors.confirm_password.message}
                   </span>
                 )}
               </div>
